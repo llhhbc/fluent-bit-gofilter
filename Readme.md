@@ -1,9 +1,19 @@
 
 ## How to use
 
+## 1. build go lib
+
+> build go src to generate cgolib.so 
+
+```sh
+sh build.sh
+```
+
+## 2. config fluent-bit
+
 > you may config in fluent-bit conf.
 
-```ini
+```conf
 [FILTER]
         Name  cgolib
         Match  *
@@ -17,22 +27,20 @@
         parse_config_file  /fluent-bit/etc/filter_cgolib.yaml   ## same with ../config/config.yaml
 ``` 
 
-## modules
+## 配置文件说明
 
-### 1. k8s
+### lib库参数说明
 
-```ini
+```conf
 parameters:
 kube_config          kube client config file
 lib_args             init args, init glog
+parse_config_file    config file of parseFilter
 ```
 
-## filters
-```ini
-parameters:
-parse_config_file   config file of parseFilter
-```
-[example](../config/config.yaml)
+[example of parse_config_file](../config/config.yaml)
+
+## 配置文件各个配置项说明
 
 ### matchers
 
@@ -55,54 +63,54 @@ revert: false
 ### parses
 
 1. parseRegex
-
-将定义的key的值根据配置的regex进行解析, preserve_key为true表示会保留原key
-
-```yaml
-name: getPodUid
-key: logpath
-preserve_key: true
-regex: ".*pods/?(?P<pod_uid>[a-z0-9](?:[-a-z0-9]*[a-z0-9]))?/volumes/.*"
-```
+    
+    将定义的key的值根据配置的regex进行解析, preserve_key为true表示会保留原key
+    
+    ```yaml
+    name: getPodUid
+    key: logpath
+    preserve_key: true
+    regex: ".*pods/?(?P<pod_uid>[a-z0-9](?:[-a-z0-9]*[a-z0-9]))?/volumes/.*"
+    ```
 
 2. parseK8sUid
 
-根据k8s的uid来添加k8s相关的标签, key定义从哪个字段取uid值
-
-```yaml
-name: getPodInfoByUid
-key: pod_uid
-```
-
-根据k8s的名称和命名空间来添加k8s相关的标签, key定义从哪个字段取名称, namespaceKey定义从哪个字段取命名空间
+    根据k8s的uid来添加k8s相关的标签, key定义从哪个字段取uid值
+    
+    ```yaml
+    name: getPodInfoByUid
+    key: pod_uid
+    ```
 
 3. parseK8sName
 
-```yaml
-name: getPodInfoByName
-key: pod_name
-namespaceKey: namespace_name
-```
+    根据k8s的名称和命名空间来添加k8s相关的标签, key定义从哪个字段取名称, namespaceKey定义从哪个字段取命名空间
+
+    ```yaml
+    name: getPodInfoByName
+    key: pod_name
+    namespaceKey: namespace_name
+    ```
 
 4. parseJson
 
-将字段按json格式展开, key定义了要展开的字段, preserve_key为true表示会保留原key
-
-```yaml
-name: externalLog
-key: log
-preserve_key: true
-```
+    将字段按json格式展开, key定义了要展开的字段, preserve_key为true表示会保留原key
+    
+    ```yaml
+    name: externalLog
+    key: log
+    preserve_key: true
+    ```
 
 5. parseTimer
 
-格式化日期, key表示要格式化的字段, time_format 定义了源格式, 会转成 RFC3339 格式
-
-```yaml
-name: parseMycatTime
-key: time
-time_format: 2006-01-02 15:04:05.999
-```
+    格式化日期, key表示要格式化的字段, time_format 定义了源格式, 会转成 RFC3339 格式
+    
+    ```yaml
+    name: parseMycatTime
+    key: time
+    time_format: 2006-01-02 15:04:05.999
+    ```
 
 ### filter
 
@@ -111,6 +119,7 @@ time_format: 2006-01-02 15:04:05.999
     a. matchType有两种取值: matchAll表示要满足所有的matchers, matchOne表示matchers中只要满足一个
     b. matchers 中定义需要进行matcher的名称
     c. parsers 中定义需要进行parser的名称, 会保持顺序依次执行 
+    
 
 ```yaml
 name: emptydirGetUid
