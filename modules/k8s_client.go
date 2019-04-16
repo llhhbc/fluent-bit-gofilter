@@ -2,7 +2,9 @@ package modules
 
 import (
 	"fmt"
+	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -26,18 +28,18 @@ func (t *module) HasInit() bool {
 
 type K8s struct {
 	module
-	rest      *rest.Config
-	clientSet kubernetes.Interface
+	Rest      *rest.Config
+	ClientSet kubernetes.Interface
 	stopChan  chan struct{}
 
-	podUid  sync.Map // find by uid
-	podName sync.Map // find by namespace + name
+	PodUid  sync.Map // find by uid
+	PodName sync.Map // find by namespace + name
 }
 
-var GK8s K8s
+var k8s K8s
 
 func GetK8s() *K8s {
-	return &GK8s
+	return &k8s
 }
 
 /*
@@ -48,19 +50,19 @@ kube_parse_config    kube parse config file --- yaml file
 func (t *K8s) Init(src map[string]string) error {
 	var err error
 
-	t.rest, err = clientcmd.BuildConfigFromFlags("", src["kube_config"])
+	t.Rest, err = clientcmd.BuildConfigFromFlags("", src["kube_config"])
 	if err != nil {
 		return fmt.Errorf("load kube config %s fail %s. ", src["kube_config"], err.Error())
 	}
 
-	t.clientSet, err = kubernetes.NewForConfig(t.rest)
+	t.ClientSet, err = kubernetes.NewForConfig(t.Rest)
 	if err != nil {
 		return fmt.Errorf("get clientset fail %s. ", err.Error())
 	}
 
 	t.stopChan = make(chan struct{}, 0)
 
-	factory := informers.NewSharedInformerFactoryWithOptions(t.clientSet, 10*time.Second)
+	factory := informers.NewSharedInformerFactoryWithOptions(t.ClientSet, 10*time.Second)
 
 	// register informer
 	factory.Core().V1().Pods().Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
@@ -70,6 +72,17 @@ func (t *K8s) Init(src map[string]string) error {
 	}, 10*time.Minute)
 
 	go factory.Start(t.stopChan)
+	time.Sleep(time.Second * 3)
+
+	glog.Info("WaitForCacheSync ")
+	res := factory.WaitForCacheSync(t.stopChan)
+	glog.Infof(" WaitForCacheSync end %v. ", res)
+
+	// load all pod first
+	podList, err := factory.Core().V1().Pods().Lister().List(labels.NewSelector())
+	for _, pod := range podList {
+		t.addPodMap(pod)
+	}
 
 	t.InitModule()
 
@@ -86,8 +99,8 @@ func (t *K8s) addPodMap(obj interface{}) {
 
 	switch d := obj.(type) {
 	case *v1.Pod:
-		t.podUid.Store(string(d.UID), d)
-		t.podName.Store(d.Namespace+d.Name, d)
+		t.PodUid.Store(string(d.UID), d)
+		t.PodName.Store(d.Namespace+d.Name, d)
 	}
 }
 
@@ -95,8 +108,8 @@ func (t *K8s) updatePodMap(oldobj, obj interface{}) {
 
 	switch d := obj.(type) {
 	case *v1.Pod:
-		t.podUid.Store(string(d.UID), d)
-		t.podName.Store(d.Namespace+d.Name, d)
+		t.PodUid.Store(string(d.UID), d)
+		t.PodName.Store(d.Namespace+d.Name, d)
 	}
 }
 
@@ -104,7 +117,7 @@ func (t *K8s) deletePodMap(obj interface{}) {
 
 	switch d := obj.(type) {
 	case *v1.Pod:
-		t.podUid.Delete(string(d.UID))
-		t.podName.Delete(d.Namespace + d.Name)
+		t.PodUid.Delete(string(d.UID))
+		t.PodName.Delete(d.Namespace + d.Name)
 	}
 }

@@ -18,6 +18,10 @@ type Config struct {
 }
 
 func (t *Config) ApplyConfig() error {
+	err := t.ParseConfig.ApplyConfig()
+	if err != nil {
+		return err
+	}
 
 	// load external parse config file
 	for _, fp := range t.ExternalParseConfigs {
@@ -59,9 +63,10 @@ func (t *Config) ApplyConfig() error {
 }
 
 type FilterConfig struct {
-	Name     string   `yaml:"name"`
-	Matchers []string `yaml:"matchers"`
-	Filters  []string `yaml:"filters"`
+	Name      string   `yaml:"name"`
+	MatchType string   `yaml:"matchType"` // matchAll, matchOne
+	Matchers  []string `yaml:"matchers"`
+	Parsers   []string `yaml:"parsers"`
 }
 
 type ParseConfig struct {

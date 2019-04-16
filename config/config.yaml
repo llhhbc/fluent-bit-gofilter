@@ -1,0 +1,77 @@
+parseConfig:
+  match:
+    matchField:
+      - name: empdirlog
+        key: logpath
+        matchRegex: .*empty-dir.*
+      - name: containerlog
+        key: logpath
+        matchRegex: .*log/containers.*
+      - name: glogContainer
+        key: container_name
+        matchRegex: '(driver-registrar|kube-keepalived-vip|operator|webserver|csi-qcfsplugin|webserver|operator)'
+      - name: mycatlog
+        key: tag
+        matchRegex: '.*mycat.*'
+      - name: mssqllog
+        key: tag
+        matchRegex: '.*mssql.*'
+  parser:
+    parseRegex:
+      - name: getPodUid
+        key: logpath
+        preserve_key: true
+        regex: ".*pods/?(?P<pod_uid>[a-z0-9](?:[-a-z0-9]*[a-z0-9]))?/volumes/.*"
+      - name: getPodName
+        key: logpath
+        preserve_key: true
+        regex: '([^.]+)?/(?P<pod_name>[a-z0-9](?:[-a-z0-9]*[a-z0-9])?(?:\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)_(?P<namespace_name>[^_]+)_(?P<container_name>.+)-(?P<docker_id>[a-z0-9]{64})\.log$'
+      - name: parseGlog
+        key: log
+        preserve_key: true
+        regex: '(?P<level>[A-Z])(?P<glog_time>[^A-Z]*)  (?P<glog_idx>.) (?P<glog_file>[^:]*):(?P<glog_fileidx>[^\]]*)] (?P<glog_msg>(.|\n|\r)*)'
+    parseK8sUid:
+      - name: getPodInfoByUid
+        key: pod_uid
+    parseK8sName:
+      - name: getPodInfoByName
+        key: pod_name
+        namespaceKey: namespace_name
+    parseJson:
+      - name: externalLog
+        key: log
+        preserve_key: true
+    parseTimer:
+      - name: parseMycatTime
+        key: time
+        time_format: 2006-01-02 15:04:05.999
+filters:
+  - name: emptydirGetUid
+    matchType: matchAll
+    matchers:
+      - empdirlog
+    parsers:
+      - getPodUid
+      - getPodInfoByUid
+  - name: kuberLogGetInfo
+    matchType: matchAll
+    matchers:
+      - containerlog
+    parsers:
+      - getPodName
+      - getPodInfoByName
+  - name: externalGlog
+    matchType: matchOne
+    matchers:
+      - glogContainer
+    parsers:
+      - parseGlog
+  - name: mycatParseTime
+    matchType: matchOne
+    matchers:
+      - mycatlog
+      - mssqllog
+    parsers:
+      - parseMycatTime
+externalParseConfigs:
+externalFilters:

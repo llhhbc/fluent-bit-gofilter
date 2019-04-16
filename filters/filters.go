@@ -1,8 +1,8 @@
 package filters
 
 import (
-	"cgolib/filters/k8s"
 	"fmt"
+	"github.com/golang/glog"
 	"strings"
 )
 
@@ -15,7 +15,7 @@ var (
 )
 
 func init() {
-	registerFilters["k8s"] = &k8s.K8s{}
+	registerFilters["parseFilter"] = &ParseFilter{}
 }
 
 type Filter interface {
@@ -46,7 +46,7 @@ func InitPlugins(config map[string]string) error {
 				return err
 			}
 			initFilters[v] = p
-			fmt.Printf("init golib plugin %s ok.\n", v)
+			glog.Infof("init golib plugin %s ok.\n", v)
 		}
 	}
 

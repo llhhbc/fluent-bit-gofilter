@@ -1,13 +1,14 @@
 package main
 
-import "C"
 import (
+	"C"
 	"cgolib/filters"
 	"cgolib/modules"
 	"flag"
 	"fmt"
 	"github.com/golang/glog"
 	"strings"
+	"time"
 )
 
 //export Golib_init
@@ -22,17 +23,18 @@ func Golib_init(name, value []string) int {
 			fmt.Println("parse lib_args fail ", err)
 			return -1
 		}
+		fmt.Println("init golib with args ", src["lib_args"])
 	}
 
 	err := modules.Init(src)
 	if err != nil {
-		glog.Error("init module fail: ", err)
+		fmt.Println("init module fail: ", err)
 		return -1
 	}
 
 	err = filters.InitPlugins(src)
 	if err != nil {
-		glog.Error("init plugin fail: ", err)
+		fmt.Println("init plugin fail: ", err)
 		return -1
 	}
 
@@ -50,6 +52,7 @@ func Golib_filter(srcName, srcValue []string) int {
 	err := filters.FilterPlugins(src)
 	if err != nil {
 		glog.Error("do filter fail ", err)
+		fmt.Println("do filter fail ", err)
 		return -1
 	}
 
@@ -60,6 +63,10 @@ func Golib_filter(srcName, srcValue []string) int {
 func Golib_exit() int {
 
 	glog.Infoln("go exit")
+
+	defer func() {
+		time.Sleep(3 * time.Second) // go need time to free routines. without this , 'fatal: morestack on g0' will happened.
+	}()
 
 	err := modules.Exit()
 	if err != nil {
@@ -79,14 +86,23 @@ func Golib_exit() int {
 func loadCallIn(name, value []string) map[string]string {
 	res := make(map[string]string)
 	for idx, n := range name {
-		res[n] = value[idx]
+		if n == "log" {
+			res[n] = res[n] + value[idx] // log key combine
+		} else {
+			res[n] = value[idx]
+		}
 	}
+	glog.V(5).Infoln("load ok: ", name, value, res)
 	return res
 }
 
 func unLoadCallIn(src map[string]string, name, value []string) int {
 	index := 0
 	for k, v := range src {
+		if k == "" {
+			// skip  empty name
+			continue
+		}
 		name = cgoSetSlice(name, index, k)
 		value = cgoSetSlice(value, index, v)
 		index++
@@ -121,4 +137,6 @@ func cgoSetSlice(src []string, index int, value string) []string {
 	return src
 }
 
-func main() {}
+func main() {
+	flag.Parse()
+}
